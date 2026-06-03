@@ -4,6 +4,10 @@ A lightweight, self-hosted **operations dashboard for [Claude Code](https://docs
 
 It uses only the native `claude agents --json` output (no wrapper around the `claude` binary, no cloud, no telemetry). The dashboard runs locally and binds to `127.0.0.1` by default.
 
+![cc-cockpit dashboard](docs/01-overview.png)
+
+> Screenshots use anonymized demo data.
+
 ## Features
 
 Per session, aggregated from your local machine **and** any number of remote hosts over SSH:
@@ -17,6 +21,18 @@ Per session, aggregated from your local machine **and** any number of remote hos
 - **Jump into the terminal** of any session (one click → opens a terminal that attaches/resumes it)
 - **Stop** a background session, or **start a new one** (`claude --bg`) from the UI
 - Column show/hide (persisted), live search, host/status filters, keyboard shortcuts
+
+## Screenshots
+
+**Detail drawer** — everything about one session in one place, with row/drawer actions (jump into terminal, copy command, diff, logs, stop):
+
+![session detail](docs/02-session-detail.png)
+
+**Show/hide columns** (persisted in the browser) and **start a new background session** (`claude --bg`) from the UI:
+
+![column selector](docs/03-columns.png)
+
+![new session](docs/04-new-session.png)
 
 ## Requirements
 
@@ -84,17 +100,56 @@ journalctl --user -u cc-cockpit -f
 - Uses a **dedicated SSH key** (`~/.config/cc-cockpit/id_cockpit`), never your personal key. For least privilege you can restrict that key on each host with a forced-command wrapper in `authorized_keys`.
 - The "jump into terminal" and "new session" actions execute commands locally/over SSH — another reason to keep the bind address on localhost.
 
-## How it works
+## Architecture
 
-```
-browser ──HTTP──> server.py (stdlib, localhost)
-                      │  polls every CC_INTERVAL
-                      ├─ local:  python3 enrich.py
-                      └─ remote: ssh <host> python3 -  < enrich.py
-                                   └─ runs `claude agents --json` + reads ~/.claude transcripts
+```mermaid
+flowchart LR
+  B["Browser — dashboard UI"] -->|"HTTP · 127.0.0.1:8910"| S
+
+  subgraph LOCAL["Machine running cc-cockpit"]
+    S["server.py<br/>stdlib HTTP + poller"]
+    EL["enrich.py (local)"]
+    PRT["PR cache thread<br/>gh · every 90s"]
+    CL["Claude Code<br/>local sessions"]
+    S -->|"every CC_INTERVAL"| EL
+    EL -->|"claude agents --json<br/>+ ~/.claude transcripts"| CL
+    S --> PRT
+  end
+
+  subgraph REMOTE["Remote hosts"]
+    R1["host A · Claude Code"]
+    R2["host B · Claude Code"]
+  end
+
+  S -->|"ssh host python3 - &lt; enrich.py"| R1
+  S -->|"ssh host python3 - &lt; enrich.py"| R2
+  PRT -->|"gh pr list"| GH["GitHub API"]
 ```
 
-`enrich.py` runs identically locally and (piped over SSH) on each remote host, so every machine reports the same rich data with a single round-trip.
+`enrich.py` is the core: it runs **identically** locally and — piped over SSH — **on each remote host**, so every machine reports the same rich data (model, context fill, git, permission mode, last message, …) in a single round-trip. Only `server.py` ever talks to the browser; remote hosts only run `claude agents --json` plus a read-only transcript scan. The PR column is refreshed by a separate background thread so `gh` latency never slows the main poll.
+
+### Action flow — "jump into terminal"
+
+```mermaid
+sequenceDiagram
+  participant U as You (browser)
+  participant S as server.py
+  participant H as Host (local or via SSH)
+  U->>S: POST /api/open { host, sessionId }
+  Note over S: build command:<br/>interactive → claude --resume<br/>background → claude attach
+  S->>H: open Terminal (macOS) / terminal emulator (Linux)
+  H-->>U: live session opens in a new terminal window
+```
+
+### Files
+
+| Path | Purpose |
+|------|---------|
+| `~/.local/share/cc-cockpit/server.py` | HTTP server + poller + action endpoints |
+| `~/.local/share/cc-cockpit/enrich.py` | per-host data collection (local & over SSH) |
+| `~/.local/share/cc-cockpit/web/index.html` | the single-file dashboard UI |
+| `~/.config/cc-cockpit/hosts.conf` | host list (one line per source) |
+| `~/.config/cc-cockpit/id_cockpit` | dedicated SSH key (never committed) |
 
 ## License
 
