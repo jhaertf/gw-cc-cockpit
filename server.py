@@ -3,8 +3,8 @@
 # Copyright (C) 2026 GuniWeb moderne Medien GmbH
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Free software under the GNU Affero General Public License v3 or later; see LICENSE.
-"""cc-cockpit server — pollt lokale + entfernte Hosts, serviert das Dashboard.
-Nur Python-stdlib. Bindet standardmaessig an 127.0.0.1 (nur lokal erreichbar)."""
+"""cc-cockpit server — polls local + remote hosts and serves the dashboard.
+Python stdlib only. Binds to 127.0.0.1 by default (local access only)."""
 import json, os, re, time, threading, subprocess, shlex, tempfile, urllib.parse
 import platform
 import http.server, socketserver
@@ -114,13 +114,13 @@ def find_session(host, sid):
 
 
 def attach_command(s):
-    # Interaktive Sessions koennen nicht "attached" werden (das ist nur fuer
-    # Hintergrund-Jobs) -> stattdessen per --resume neu oeffnen.
+    # Interactive sessions can't be "attached" (that's only for background jobs)
+    # -> reopen them with --resume instead.
     sid = s["sessionId"]
     target = s.get("target")
     cwd = s.get("cwd")
     if s.get("kind") == "interactive":
-        # --resume ist projektgebunden -> erst in den cwd der Session wechseln
+        # --resume is project-scoped -> cd into the session's cwd first
         local = "claude --resume " + sid
         if cwd:
             local = "cd " + shlex.quote(cwd) + " && " + local
@@ -133,10 +133,10 @@ def attach_command(s):
 
 def open_terminal(host, sid):
     if not SID_RE.match(sid or ""):
-        return False, "ungueltige Session-ID"
+        return False, "invalid session id"
     s = find_session(host, sid)
     if not s:
-        return False, "Session unbekannt"
+        return False, "unknown session"
     cmd = attach_command(s)
     if platform.system() == "Darwin":
         path = os.path.join(RUNDIR, "attach-%s.command" % sid[:8])
@@ -144,26 +144,26 @@ def open_terminal(host, sid):
             f.write("#!/bin/bash\nclear\necho '> %s'\n%s\n" % (cmd.replace("'", "'\\''"), cmd))
         os.chmod(path, 0o755)
         r = subprocess.run(["open", path], capture_output=True, text=True, timeout=10)
-        return (r.returncode == 0), (r.stderr.strip() or "Terminal geoeffnet")
-    # Linux: ersten verfuegbaren Terminal-Emulator nutzen
+        return (r.returncode == 0), (r.stderr.strip() or "terminal opened")
+    # Linux: use the first available terminal emulator
     inner = cmd + "; exec bash"
     for term in (["x-terminal-emulator", "-e"], ["gnome-terminal", "--"],
                  ["konsole", "-e"], ["xfce4-terminal", "-e"], ["xterm", "-e"]):
         if which(term[0]):
             try:
                 subprocess.Popen(term + ["bash", "-lc", inner])
-                return True, "Terminal geoeffnet"
+                return True, "terminal opened"
             except Exception as e:
                 return False, str(e)
-    return False, "kein Terminal-Emulator gefunden (macOS/Linux unterstuetzt)"
+    return False, "no terminal emulator found (macOS/Linux supported)"
 
 
 def get_logs(host, sid):
     if not SID_RE.match(sid or ""):
-        return "ungueltige Session-ID"
+        return "invalid session id"
     s = find_session(host, sid)
     if not s:
-        return "Session unbekannt"
+        return "unknown session"
     target = s.get("target")
     if not target or target == "local":
         cmd = ["claude", "logs", sid]
@@ -174,19 +174,19 @@ def get_logs(host, sid):
         out = (r.stdout or "").strip()
         err = (r.stderr or "").strip()
         if not out and (r.returncode != 0 or "--print" in err or "must be provided" in err):
-            return "Logs sind nur fuer Hintergrund-Sessions verfuegbar — diese Session laeuft interaktiv (siehe 'Letzte Antwort' oben fuer den aktuellen Stand)."
+            return "Logs are only available for background sessions — this one is interactive (see 'Last reply' above for the current state)."
         return out + (("\n" + err) if err else "")
     except Exception as e:
-        return "Fehler: %s" % e
+        return "Error: %s" % e
 
 
 def get_diff(host, sid):
     s = find_session(host, sid)
     if not s:
-        return "Session unbekannt"
+        return "unknown session"
     cwd, target = s.get("cwd"), s.get("target")
     if not cwd:
-        return "kein Arbeitsverzeichnis"
+        return "no working directory"
     try:
         if not target or target == "local":
             r = subprocess.run(["git", "-C", cwd, "--no-pager", "diff", "HEAD"],
@@ -196,23 +196,23 @@ def get_diff(host, sid):
             r = subprocess.run(SSH + [target, "bash", "-lc", inner],
                                capture_output=True, text=True, timeout=25)
         out = r.stdout or ""
-        return out[:200000] if out.strip() else "(keine uncommitteten Änderungen)"
+        return out[:200000] if out.strip() else "(no uncommitted changes)"
     except Exception as e:
-        return "Fehler: %s" % e
+        return "Error: %s" % e
 
 
 def stop_session(host, sid):
     if not SID_RE.match(sid or ""):
-        return False, "ungueltige Session-ID"
+        return False, "invalid session id"
     s = find_session(host, sid)
     if not s:
-        return False, "Session unbekannt"
+        return False, "unknown session"
     target = s.get("target")
     cmd = (["claude", "stop", sid] if not target or target == "local"
            else SSH + [target, "bash", "-lc", "claude stop " + sid])
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
-        return (r.returncode == 0), ((r.stdout or r.stderr or "").strip() or "gestoppt")
+        return (r.returncode == 0), ((r.stdout or r.stderr or "").strip() or "stopped")
     except Exception as e:
         return False, str(e)
 
@@ -227,10 +227,10 @@ def host_target(host):
 def new_session(host, cwd, prompt):
     prompt = (prompt or "").strip()
     if len(prompt) < 4:
-        return False, "Prompt zu kurz"
+        return False, "prompt too short"
     target, ok = host_target(host)
     if not ok:
-        return False, "Host unbekannt"
+        return False, "unknown host"
     base = "claude --bg %s" % shlex.quote(prompt)
     if cwd:
         base = "cd %s && %s" % (shlex.quote(cwd), base)
@@ -240,7 +240,7 @@ def new_session(host, cwd, prompt):
         else:
             r = subprocess.run(SSH + [target, "bash", "-lc", base],
                                capture_output=True, text=True, timeout=30)
-        return (r.returncode == 0), ((r.stdout or r.stderr or "").strip() or "gestartet")
+        return (r.returncode == 0), ((r.stdout or r.stderr or "").strip() or "started")
     except Exception as e:
         return False, str(e)
 

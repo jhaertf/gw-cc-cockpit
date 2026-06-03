@@ -1,6 +1,6 @@
 <!doctype html>
 <!-- cc-cockpit — Copyright (C) 2026 GuniWeb moderne Medien GmbH — AGPL-3.0-or-later (see LICENSE) -->
-<html lang="de">
+<html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -157,10 +157,10 @@
     <div class="brand">CLAUDE<span class="sub">·OPS</span></div>
     <div class="stripe" id="kpis"></div>
     <div class="grow"></div>
-    <button class="newbtn" id="newbtn">+ Neue Session</button>
+    <button class="newbtn" id="newbtn">+ New session</button>
     <div class="search">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4-4"/></svg>
-      <input id="q" placeholder="suchen…" autocomplete="off" spellcheck="false"/>
+      <input id="q" placeholder="search…" autocomplete="off" spellcheck="false"/>
       <kbd>/</kbd>
     </div>
     <div class="sync"><span class="led" id="led"></span><span id="sync">—</span></div>
@@ -170,7 +170,7 @@
     <div class="seg" id="hostseg"></div>
     <div class="seg" id="statusseg"></div>
     <div class="colpick">
-      <button class="newbtn" id="colbtn" style="padding:5px 11px">Spalten ▾</button>
+      <button class="newbtn" id="colbtn" style="padding:5px 11px">Columns ▾</button>
       <div class="colmenu" id="colmenu"></div>
     </div>
     <div class="meta" id="count"></div>
@@ -192,15 +192,15 @@
 
 <div class="modal-scrim" id="modalScrim"></div>
 <div class="modal" id="modal">
-  <h3>Neue Hintergrund-Session</h3>
+  <h3>New background session</h3>
   <div class="mb">
     <div><label>Host</label><select id="nHost"></select></div>
-    <div><label>Arbeitsverzeichnis (cwd)</label><input id="nCwd" placeholder="/path/to/project" spellcheck="false"/></div>
-    <div><label>Aufgabe / Prompt</label><textarea id="nPrompt" placeholder="z. B. failing tests in src/ untersuchen und beheben"></textarea></div>
+    <div><label>Working directory (cwd)</label><input id="nCwd" placeholder="/path/to/project" spellcheck="false"/></div>
+    <div><label>Task / prompt</label><textarea id="nPrompt" placeholder="e.g. investigate and fix the failing tests in src/"></textarea></div>
   </div>
   <div class="mf">
-    <button class="btn" id="nCancel">Abbrechen</button>
-    <button class="btn primary" id="nStart">Starten (claude --bg)</button>
+    <button class="btn" id="nCancel">Cancel</button>
+    <button class="btn primary" id="nStart">Start (claude --bg)</button>
   </div>
 </div>
 
@@ -215,13 +215,13 @@ const COLS=[
   {k:"status",t:"Status",cell:s=>`<div class="st"><span class="sdot ${sdotCls(s.status)}"></span><span class="stxt">${esc(s.status)}</span></div>`},
   {k:"host",t:"Host",cell:s=>`<span class="hostb">${esc(s.host)}</span>`},
   {k:"project",t:"Session",cell:s=>`<div class="proj">${esc(s.project||"—")}${permBadge(s)}</div><div class="path" title="${esc(s.cwd)}">${esc(s.cwd||"")}</div>`},
-  {k:"model",t:"Modell",cell:s=>s.model?`<span class="model">${esc(modelShort(s.model))}</span>`:`<span class="dim">—</span>`},
-  {k:"context",t:"Kontext",cell:s=>ctxCell(s)},
+  {k:"model",t:"Model",cell:s=>s.model?`<span class="model">${esc(modelShort(s.model))}</span>`:`<span class="dim">—</span>`},
+  {k:"context",t:"Context",cell:s=>ctxCell(s)},
   {k:"branch",t:"Branch",cell:s=>branchCell(s)},
   {k:"pr",t:"PR",nosort:true,cell:s=>prCell(s)},
-  {k:"activity",t:"Aktivität",cell:s=>`<span class="num">${relIso(s.lastActivity)||rel(s.startedAt)}</span>`},
+  {k:"activity",t:"Activity",cell:s=>`<span class="num">${relIso(s.lastActivity)||rel(s.startedAt)}</span>`},
   {k:"cc",t:"CC",cell:s=>`<span class="num">${esc(s.claudeVersion||"—")}</span>`},
-  {k:"_act",t:"",nosort:true,fixed:true,cell:s=>`<div class="acts"><div class="ic" data-act="open" title="ins Terminal springen">${ICON.term}</div><div class="ic" data-act="copy" title="Befehl kopieren">${ICON.copy}</div><div class="ic" data-act="logs" title="Logs">${ICON.logs}</div><div class="ic" data-act="stop" title="Session stoppen">${ICON.stop}</div></div>`},
+  {k:"_act",t:"",nosort:true,fixed:true,cell:s=>`<div class="acts"><div class="ic" data-act="open" title="jump into terminal">${ICON.term}</div><div class="ic" data-act="copy" title="copy command">${ICON.copy}</div><div class="ic" data-act="logs" title="logs">${ICON.logs}</div><div class="ic" data-act="stop" title="stop session">${ICON.stop}</div></div>`},
 ];
 const ICON={
   term:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m5 8 4 4-4 4"/><path d="M13 16h6"/><rect x="2" y="3" width="20" height="18" rx="2"/></svg>',
@@ -231,11 +231,11 @@ const ICON={
   diff:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M5 8h14M5 16h14"/></svg>',
 };
 function permMeta(p){if(!p||p==="default")return null;return {bypassPermissions:["bypass","bad"],acceptEdits:["accept-edits","warn"],auto:["auto","warn"],plan:["plan","accent"]}[p]||[p,"dim"];}
-function permBadge(s){const m=permMeta(s.permMode);return m?`<span class="perm ${m[1]}" title="Permission-Mode: ${esc(s.permMode)}">${esc(m[0])}</span>`:"";}
+function permBadge(s){const m=permMeta(s.permMode);return m?`<span class="perm ${m[1]}" title="Permission mode: ${esc(s.permMode)}">${esc(m[0])}</span>`:"";}
 function prCell(s){const pr=s.pr;if(!pr||!pr.number)return `<span class="dim">—</span>`;const cs=pr.checks?pr.checks.state:"";const st=(pr.state||"").toUpperCase();const cls=st==="MERGED"?"merged":cs==="fail"?"bad":cs==="pending"?"warn":"ok";return `<a class="pr ${cls}" href="${esc(pr.url)}" target="_blank" rel="noopener" title="${esc(st)}${pr.checks?' · '+esc(pr.checks.label):''}">#${esc(pr.number)}${pr.checks?` <span class="prc">${esc(pr.checks.label)}</span>`:""}</a>`;}
 function ctxCell(s){const pct=s.contextPct;if(pct==null)return `<span class="dim">—</span>`;const lvl=pct>=90?"h":pct>=70?"m":"";return `<div class="ctx"><div class="bar"><i class="${lvl}" style="width:${Math.min(100,pct)}%"></i></div><span class="ctxn">${pct}% · ${tk(s.contextTokens)}</span></div>`;}
 function branchCell(s){return s.gitBranch?`<span class="branch" title="${esc(s.gitBranch)}">${esc(s.gitBranch)}${s.gitDirty?` <span class="dty">±${s.gitDirty}</span>`:""}</span>`:`<span class="dim">—</span>`;}
-const COL_LABELS={status:"Status",host:"Host",project:"Session",model:"Modell",context:"Kontext",branch:"Branch",pr:"PR",activity:"Aktivität",cc:"CC"};
+const COL_LABELS={status:"Status",host:"Host",project:"Session",model:"Model",context:"Context",branch:"Branch",pr:"PR",activity:"Activity",cc:"CC"};
 let HIDDEN=new Set();try{HIDDEN=new Set(JSON.parse(localStorage.getItem("cc_hidden")||"[]"));}catch(e){}
 function isVis(c){return c.fixed||!HIDDEN.has(c.k);}
 function saveHidden(){try{localStorage.setItem("cc_hidden",JSON.stringify([...HIDDEN]));}catch(e){}}
@@ -276,15 +276,15 @@ function render(){
   const c=g=>all.filter(s=>grp(s.status)===g).length;
   document.getElementById("kpis").innerHTML=`
     <div class="kpi"><span class="n">${all.length}</span><span class="l">Sessions</span></div>
-    <div class="kpi ok"><span class="n">${c("busy")}</span><span class="l">Aktiv</span></div>
-    <div class="kpi warn"><span class="n">${c("wait")}</span><span class="l">Wartet</span></div>
+    <div class="kpi ok"><span class="n">${c("busy")}</span><span class="l">Active</span></div>
+    <div class="kpi warn"><span class="n">${c("wait")}</span><span class="l">Waiting</span></div>
     <div class="kpi idle"><span class="n">${c("idle")}</span><span class="l">Idle</span></div>`;
 
   const hosts=[...new Set(all.map(s=>s.host))].sort();
   document.getElementById("hostseg").innerHTML=
-    `<button data-h="*" class="${hostF==="*"?"on":""}">Alle</button>`+
+    `<button data-h="*" class="${hostF==="*"?"on":""}">All</button>`+
     hosts.map(h=>`<button data-h="${esc(h)}" class="${hostF===h?"on":""}">${esc(h)}<span class="c">${all.filter(s=>s.host===h).length}</span></button>`).join("");
-  const ST=[["*","Alle"],["wait","Wartet"],["busy","Aktiv"],["idle","Idle"],["other","Sonstige"]];
+  const ST=[["*","All"],["wait","Waiting"],["busy","Active"],["idle","Idle"],["other","Other"]];
   document.getElementById("statusseg").innerHTML=ST.map(([k,t])=>`<button data-s="${k}" class="${statusF===k?"on":""}">${t}</button>`).join("");
 
   const vis=COLS.filter(isVis);
@@ -293,12 +293,12 @@ function render(){
     return `<th data-k="${col.k}" class="${col.nosort?"nosort":""} ${on?"sorted":""}">${esc(col.t)}<span class="ar">${ar}</span></th>`;
   }).join("");
 
-  document.getElementById("bnr").innerHTML=(DATA.errors||[]).length?`<div class="bnr err">⚠ nicht erreichbar: ${DATA.errors.map(esc).join(", ")}</div>`:"";
+  document.getElementById("bnr").innerHTML=(DATA.errors||[]).length?`<div class="bnr err">⚠ unreachable: ${DATA.errors.map(esc).join(", ")}</div>`:"";
 
   const list=filtered();
   document.getElementById("count").textContent=`${list.length} / ${all.length}`;
   const rows=document.getElementById("rows"),empty=document.getElementById("empty");
-  if(!list.length){rows.innerHTML="";empty.style.display="block";empty.textContent=all.length?"keine Treffer für den Filter":"keine Sessions gefunden";}
+  if(!list.length){rows.innerHTML="";empty.style.display="block";empty.textContent=all.length?"no matches for filter":"no sessions found";}
   else{
     empty.style.display="none";
     rows.innerHTML=list.map(s=>`<tr data-id="${esc(s.sessionId)}" data-host="${esc(s.host)}" class="${selId===s.sessionId?"sel":""}">`
@@ -319,29 +319,29 @@ function renderDrawer(){
     <div class="dbody">
       ${f("Host",`<span class="hostb">${esc(s.host)}</span> <span class="dim mono">${esc(s.target)}</span>`)}
       ${f("Status",`<span class="st"><span class="sdot ${sdotCls(s.status)}"></span>${esc(s.status)}</span>`)}
-      ${f("Modell",s.model?esc(modelShort(s.model))+` <span class="dim mono">${esc(s.model)}</span>`:"—")}
-      ${f("Kontext",s.contextPct==null?"—":`${s.contextPct}% — ${tk(s.contextTokens)}${win} Token`+(s.outputTokens?` <span class="dim">· out ${tk(s.outputTokens)}</span>`:""))}
-      ${f("Git",s.gitBranch?esc(s.gitBranch)+(s.gitDirty?` <span style="color:var(--warn)">±${s.gitDirty} geändert</span>`:" <span class='dim'>clean</span>"):"—",true)}
-      ${s.diffStat?f("Diff-Stat",esc(s.diffStat),true):""}
+      ${f("Model",s.model?esc(modelShort(s.model))+` <span class="dim mono">${esc(s.model)}</span>`:"—")}
+      ${f("Context",s.contextPct==null?"—":`${s.contextPct}% — ${tk(s.contextTokens)}${win} tokens`+(s.outputTokens?` <span class="dim">· out ${tk(s.outputTokens)}</span>`:""))}
+      ${f("Git",s.gitBranch?esc(s.gitBranch)+(s.gitDirty?` <span style="color:var(--warn)">±${s.gitDirty} changed</span>`:" <span class='dim'>clean</span>"):"—",true)}
+      ${s.diffStat?f("Diff stat",esc(s.diffStat),true):""}
       ${f("Permission",permMeta(s.permMode)?`<span class="perm ${permMeta(s.permMode)[1]}">${esc(permMeta(s.permMode)[0])}</span>`:"<span class='dim'>default</span>")}
       ${f("Pull Request",(s.pr&&s.pr.number)?prCell(s):"—")}
       ${f("Turns",s.turns!=null?s.turns:"—",true)}
       ${f("kind / pid",`${esc(s.kind||"—")} <span class="dim">·</span> ${esc(s.pid||"—")}`,true)}
-      ${f("CC-Version",esc(s.claudeVersion||"—"),true)}
-      ${f("Gestartet",s.startedAt?new Date(s.startedAt).toLocaleString("de-DE")+` <span class="dim">(${rel(s.startedAt)})</span>`:"—",true)}
-      ${f("Letzte Aktiv.",s.lastActivity?new Date(s.lastActivity).toLocaleString("de-DE")+` <span class="dim">(${relIso(s.lastActivity)})</span>`:"—",true)}
-      ${f("Session-ID",esc(s.sessionId),true)}
+      ${f("CC version",esc(s.claudeVersion||"—"),true)}
+      ${f("Started",s.startedAt?new Date(s.startedAt).toLocaleString("en-GB")+` <span class="dim">(${rel(s.startedAt)})</span>`:"—",true)}
+      ${f("Last active",s.lastActivity?new Date(s.lastActivity).toLocaleString("en-GB")+` <span class="dim">(${relIso(s.lastActivity)})</span>`:"—",true)}
+      ${f("Session ID",esc(s.sessionId),true)}
       ${f("Transcript",s.transcript?esc(s.transcript):"—",true)}
-      ${s.lastText?`<div class="field" style="display:block"><div class="k">Letzte Antwort</div><div class="snip">${esc(s.lastText)}</div></div>`:""}
+      ${s.lastText?`<div class="field" style="display:block"><div class="k">Last reply</div><div class="snip">${esc(s.lastText)}</div></div>`:""}
       <div id="diffbox"></div>
       <div id="logbox"></div>
     </div>
     <div class="dactions">
-      <button class="btn primary" onclick="doOpen('${esc(s.host)}','${esc(s.sessionId)}')">${ICON.term}Ins Terminal springen</button>
-      <button class="btn" onclick="copyText(attachCmd(findSel('${esc(s.sessionId)}')))">${ICON.copy}Befehl kopieren</button>
+      <button class="btn primary" onclick="doOpen('${esc(s.host)}','${esc(s.sessionId)}')">${ICON.term}Jump into terminal</button>
+      <button class="btn" onclick="copyText(attachCmd(findSel('${esc(s.sessionId)}')))">${ICON.copy}Copy command</button>
       <button class="btn" onclick="loadDiff('${esc(s.host)}','${esc(s.sessionId)}')">${ICON.diff}Diff</button>
       <button class="btn" onclick="loadLogs('${esc(s.host)}','${esc(s.sessionId)}')">${ICON.logs}Logs</button>
-      <button class="btn" onclick="doStop('${esc(s.host)}','${esc(s.sessionId)}')">${ICON.stop}Stoppen</button>
+      <button class="btn" onclick="doStop('${esc(s.host)}','${esc(s.sessionId)}')">${ICON.stop}Stop</button>
     </div>`;
 }
 
@@ -349,23 +349,23 @@ function openDrawer(id){drawerId=id;selId=id;document.getElementById("drawer").c
 function closeDrawer(){drawerId=null;document.getElementById("drawer").classList.remove("on");document.getElementById("scrim").classList.remove("on");}
 
 async function doOpen(host,id){
-  toast("Terminal wird geöffnet…");
-  try{const r=await fetch("/api/open",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({host,sessionId:id})});const j=await r.json();toast(j.ok?"Terminal geöffnet":("Fehler: "+(j.msg||"")),!j.ok);}
-  catch(e){toast("Fehler beim Öffnen",true);}
+  toast("Opening terminal…");
+  try{const r=await fetch("/api/open",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({host,sessionId:id})});const j=await r.json();toast(j.ok?"Terminal opened":("Error: "+(j.msg||"")),!j.ok);}
+  catch(e){toast("Failed to open",true);}
 }
-function copyText(t){navigator.clipboard.writeText(t).then(()=>toast("kopiert: "+t.slice(0,46)+(t.length>46?"…":"")));}
+function copyText(t){navigator.clipboard.writeText(t).then(()=>toast("copied: "+t.slice(0,46)+(t.length>46?"…":"")));}
 async function loadLogs(host,id){
-  const box=document.getElementById("logbox");if(box)box.innerHTML=`<div class="logs">lade…</div>`;
-  try{const r=await fetch("/api/logs?host="+encodeURIComponent(host)+"&id="+encodeURIComponent(id));const j=await r.json();if(box)box.innerHTML=`<div class="logs">${esc((j.text||"(leer)").slice(-6000))}</div>`;}
-  catch(e){if(box)box.innerHTML=`<div class="logs">Fehler beim Laden</div>`;}
+  const box=document.getElementById("logbox");if(box)box.innerHTML=`<div class="logs">loading…</div>`;
+  try{const r=await fetch("/api/logs?host="+encodeURIComponent(host)+"&id="+encodeURIComponent(id));const j=await r.json();if(box)box.innerHTML=`<div class="logs">${esc((j.text||"(empty)").slice(-6000))}</div>`;}
+  catch(e){if(box)box.innerHTML=`<div class="logs">Failed to load</div>`;}
 }
 function colorDiff(t){return esc(t).split("\n").map(l=>{if(/^\+(?!\+\+)/.test(l))return '<span class="add">'+l+'</span>';if(/^-(?!--)/.test(l))return '<span class="del">'+l+'</span>';if(/^(@@|diff |index |\+\+\+|---)/.test(l))return '<span class="hdr">'+l+'</span>';return l;}).join("\n");}
-async function loadDiff(host,id){const box=document.getElementById("diffbox");if(box)box.innerHTML='<div class="diffbox"><pre>lade…</pre></div>';try{const r=await fetch("/api/diff?host="+encodeURIComponent(host)+"&id="+encodeURIComponent(id));const j=await r.json();if(box)box.innerHTML='<div class="diffbox"><pre>'+colorDiff((j.text||"").slice(0,120000))+'</pre></div>';}catch(e){if(box)box.innerHTML='<div class="diffbox"><pre>Fehler</pre></div>';}}
-async function doStop(host,id){const s=findSel(id);if(!confirm("Session stoppen?\n"+(s?(s.project+" @ "+host):id)+"\n\nWirkt nur auf Hintergrund-Sessions — interaktive Sessions in echten Terminals lassen sich so nicht beenden."))return;try{const r=await fetch("/api/stop",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({host,sessionId:id})});const j=await r.json();toast(j.ok?"gestoppt":("Stop fehlgeschlagen: "+(j.msg||"")),!j.ok);if(j.ok)tick();}catch(e){toast("Fehler beim Stoppen",true);}}
+async function loadDiff(host,id){const box=document.getElementById("diffbox");if(box)box.innerHTML='<div class="diffbox"><pre>loading…</pre></div>';try{const r=await fetch("/api/diff?host="+encodeURIComponent(host)+"&id="+encodeURIComponent(id));const j=await r.json();if(box)box.innerHTML='<div class="diffbox"><pre>'+colorDiff((j.text||"").slice(0,120000))+'</pre></div>';}catch(e){if(box)box.innerHTML='<div class="diffbox"><pre>Error</pre></div>';}}
+async function doStop(host,id){const s=findSel(id);if(!confirm("Stop this session?\n"+(s?(s.project+" @ "+host):id)+"\n\nOnly affects background sessions — interactive sessions in real terminals can't be stopped this way."))return;try{const r=await fetch("/api/stop",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({host,sessionId:id})});const j=await r.json();toast(j.ok?"stopped":("Stop failed: "+(j.msg||"")),!j.ok);if(j.ok)tick();}catch(e){toast("Failed to stop",true);}}
 
-function openNew(){const sel=document.getElementById("nHost");const hosts=[...new Set(DATA.sessions.map(s=>s.host))];sel.innerHTML=(hosts.length?hosts:["mac"]).map(h=>`<option value="${esc(h)}">${esc(h)}</option>`).join("");document.getElementById("nCwd").value="";document.getElementById("nPrompt").value="";document.getElementById("modal").classList.add("on");document.getElementById("modalScrim").classList.add("on");document.getElementById("nPrompt").focus();}
+function openNew(){const sel=document.getElementById("nHost");const hosts=[...new Set(DATA.sessions.map(s=>s.host))];sel.innerHTML=(hosts.length?hosts:["local"]).map(h=>`<option value="${esc(h)}">${esc(h)}</option>`).join("");document.getElementById("nCwd").value="";document.getElementById("nPrompt").value="";document.getElementById("modal").classList.add("on");document.getElementById("modalScrim").classList.add("on");document.getElementById("nPrompt").focus();}
 function closeNew(){document.getElementById("modal").classList.remove("on");document.getElementById("modalScrim").classList.remove("on");}
-async function submitNew(){const host=document.getElementById("nHost").value;const cwd=document.getElementById("nCwd").value.trim();const prompt=document.getElementById("nPrompt").value.trim();if(prompt.length<4){toast("Prompt zu kurz",true);return;}toast("starte Session…");try{const r=await fetch("/api/new",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({host,cwd,prompt})});const j=await r.json();toast(j.ok?("gestartet: "+(j.msg||"").split("\n")[0]):("Fehler: "+(j.msg||"")),!j.ok);if(j.ok){closeNew();setTimeout(tick,1500);}}catch(e){toast("Fehler beim Starten",true);}}
+async function submitNew(){const host=document.getElementById("nHost").value;const cwd=document.getElementById("nCwd").value.trim();const prompt=document.getElementById("nPrompt").value.trim();if(prompt.length<4){toast("Prompt too short",true);return;}toast("starting session…");try{const r=await fetch("/api/new",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({host,cwd,prompt})});const j=await r.json();toast(j.ok?("started: "+(j.msg||"").split("\n")[0]):("Error: "+(j.msg||"")),!j.ok);if(j.ok){closeNew();setTimeout(tick,1500);}}catch(e){toast("Failed to start",true);}}
 document.getElementById("newbtn").addEventListener("click",openNew);
 document.getElementById("nCancel").addEventListener("click",closeNew);
 document.getElementById("modalScrim").addEventListener("click",closeNew);

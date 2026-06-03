@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # cc-cockpit — Copyright (C) 2026 GuniWeb moderne Medien GmbH
 # SPDX-License-Identifier: AGPL-3.0-or-later  (see LICENSE)
-"""cc-cockpit enrichment — laeuft lokal ODER per `ssh host python3 -` identisch.
-Gibt `claude agents --json` angereichert um Modell, Kontext-Fuellstand, letzte
-Aktivitaet, CC-Version, Git-Status, Permission-Mode und Diff-Stat aus. Nur stdlib."""
+"""cc-cockpit enrichment — runs locally OR identically via `ssh host python3 -`.
+Outputs `claude agents --json` enriched with model, context fill, last activity,
+CC version, git status, permission mode and diff stat. Stdlib only."""
 import json, os, glob, subprocess, re
 from shutil import which
 
