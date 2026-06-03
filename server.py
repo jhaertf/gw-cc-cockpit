@@ -6,7 +6,7 @@
 """cc-cockpit server — polls local + remote hosts and serves the dashboard.
 Python stdlib only. Binds to 127.0.0.1 by default (local access only)."""
 import json, os, re, time, threading, subprocess, shlex, tempfile, urllib.parse
-import platform
+import platform, datetime
 import http.server, socketserver
 from shutil import which
 
@@ -23,6 +23,7 @@ RUNDIR = os.path.join(BASE, "run")
 PORT = int(os.environ.get("CC_PORT", "8910"))
 BIND = os.environ.get("CC_BIND", "127.0.0.1")
 INTERVAL = int(os.environ.get("CC_INTERVAL", "8"))
+DEMO = os.environ.get("CC_DEMO", "").lower() in ("1", "true", "yes")  # serve built-in sample data
 
 os.environ["PATH"] = HOME + "/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 os.makedirs(RUNDIR, exist_ok=True)
@@ -74,7 +75,65 @@ def collect_host(label, typ, target, src):
         return None
 
 
+# ── Demo mode (CC_DEMO=1): built-in anonymized sample data, no SSH, no real actions ──
+_DEMO = [
+    {"host": "build01", "target": "deploy@build01.internal", "sessionId": "a1a1a1a1-0000-0000-0000-000000000001", "cwd": "/srv/ml-pipeline", "status": "busy", "pid": 22014, "_st": 5*3600, "_ac": 12, "model": "claude-opus-4-8", "contextTokens": 192000, "contextWindow": 200000, "contextPct": 96, "outputTokens": 1800, "claudeVersion": "2.1.159", "gitBranch": "main", "gitDirty": 0, "diffStat": None, "permMode": "bypassPermissions", "lastText": "Training run kicked off on the new dataset; monitoring validation loss.", "turns": 121, "pr": {"number": 88, "state": "OPEN", "url": "#", "checks": {"label": "1✗", "state": "fail"}}},
+    {"host": "mac", "target": "local", "sessionId": "b2b2b2b2-0000-0000-0000-000000000002", "cwd": "/Users/dev/work/billing-service", "status": "waiting", "pid": 5190, "_st": 2*3600, "_ac": 120, "model": "claude-sonnet-4-6", "contextTokens": 176000, "contextWindow": 200000, "contextPct": 88, "outputTokens": 900, "claudeVersion": "2.1.161", "gitBranch": "fix/proration", "gitDirty": 3, "diffStat": "3 files changed, 84 insertions(+), 12 deletions(-)", "permMode": "acceptEdits", "lastText": "I need a decision before continuing: should mid-cycle proration round up to the next cent or down?", "turns": 39, "pr": {"number": 412, "state": "OPEN", "url": "#", "checks": {"label": "3✓", "state": "pass"}}},
+    {"host": "gpu01", "target": "ubuntu@gpu01", "sessionId": "c3c3c3c3-0000-0000-0000-000000000003", "cwd": "/opt/infra", "status": "busy", "pid": 7733, "_st": 90*60, "_ac": 45, "model": "claude-opus-4-8[1m]", "contextTokens": 331000, "contextWindow": 1000000, "contextPct": 33, "outputTokens": 2400, "claudeVersion": "2.1.161", "gitBranch": "tf/network-refactor", "gitDirty": 21, "diffStat": "21 files changed, 612 insertions(+), 188 deletions(-)", "permMode": "bypassPermissions", "lastText": "Applied the VPC subnet split across 21 Terraform files; plan is clean.", "turns": 88, "pr": {"number": 1567, "state": "MERGED", "url": "#", "checks": None}},
+    {"host": "mac", "target": "local", "sessionId": "d4d4d4d4-0000-0000-0000-000000000004", "cwd": "/Users/dev/work/mobile-app", "status": "busy", "pid": 4990, "_st": 40*60, "_ac": 60, "model": "claude-opus-4-8", "contextTokens": 710000, "contextWindow": 1000000, "contextPct": 71, "outputTokens": 1500, "claudeVersion": "2.1.161", "gitBranch": "feat/push-notifs", "gitDirty": 4, "diffStat": "4 files changed, 156 insertions(+), 9 deletions(-)", "permMode": "default", "lastText": "Wired up APNs token registration and added a retry queue for failed pushes.", "turns": 53, "pr": {"number": 233, "state": "OPEN", "url": "#", "checks": {"label": "2…", "state": "pending"}}},
+    {"host": "build01", "target": "deploy@build01.internal", "sessionId": "e5e5e5e5-0000-0000-0000-000000000005", "cwd": "/srv/api-gateway", "status": "idle", "pid": 21888, "_st": 9*3600, "_ac": 3*3600, "model": "claude-haiku-4-5", "contextTokens": 28000, "contextWindow": 200000, "contextPct": 14, "outputTokens": 300, "claudeVersion": "2.1.161", "gitBranch": "chore/deps", "gitDirty": 12, "diffStat": "12 files changed, 240 insertions(+), 240 deletions(-)", "permMode": "default", "lastText": "Bumped 12 dependencies; tests green.", "turns": 18, "pr": None},
+    {"host": "gpu01", "target": "ubuntu@gpu01", "sessionId": "f6f6f6f6-0000-0000-0000-000000000006", "cwd": "/opt/docs-site", "status": "idle", "pid": 7012, "_st": 26*3600, "_ac": 24*3600, "model": "claude-sonnet-4-6", "contextTokens": 44000, "contextWindow": 200000, "contextPct": 22, "outputTokens": 200, "claudeVersion": "2.1.160", "gitBranch": "main", "gitDirty": 0, "diffStat": None, "permMode": "plan", "lastText": "Drafted the migration guide outline; ready for review.", "turns": 12, "pr": None},
+    {"host": "mac", "target": "local", "sessionId": "a7a7a7a7-0000-0000-0000-000000000007", "cwd": "/Users/dev/work/web-frontend", "status": "busy", "pid": 4821, "_st": 25*60, "_ac": 30, "model": "claude-opus-4-8", "contextTokens": 410000, "contextWindow": 1000000, "contextPct": 41, "outputTokens": 2100, "claudeVersion": "2.1.161", "gitBranch": "feat/checkout-redesign", "gitDirty": 7, "diffStat": "7 files changed, 240 insertions(+), 58 deletions(-)", "permMode": "default", "lastText": "Refactored the checkout flow into a multi-step wizard with optimistic UI.", "turns": 64, "pr": None},
+]
+
+DEMO_DIFF = """diff --git a/src/checkout/wizard.tsx b/src/checkout/wizard.tsx
+index 3f2a1b0..9c4e7d2 100644
+--- a/src/checkout/wizard.tsx
++++ b/src/checkout/wizard.tsx
+@@ -12,7 +12,10 @@ export function CheckoutWizard() {
+   const [step, setStep] = useState(0)
++  const [errors, setErrors] = useState({})
++  // optimistic UI: advance immediately, roll back on failure
+   return (
+-    <div className="checkout">
++    <div className="checkout checkout--wizard">
+       <Steps current={step} />
+"""
+
+DEMO_LOG = ("(demo) recent output:\n"
+            "  edited src/checkout/wizard.tsx\n"
+            "  ran `npm test` -> 142 passed\n"
+            "  staged 7 files")
+
+
+def demo_sessions():
+    now = time.time()
+    out = []
+    for d in _DEMO:
+        s = dict(d)
+        s["startedAt"] = int((now - s.pop("_st")) * 1000)
+        s["lastActivity"] = datetime.datetime.fromtimestamp(
+            now - s.pop("_ac"), datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        s["shortId"] = s["sessionId"][:8]
+        s["project"] = os.path.basename(s["cwd"])
+        s["name"] = None
+        s["kind"] = "interactive"
+        s["transcript"] = "~/.claude/projects/demo/%s.jsonl" % s["shortId"]
+        out.append(s)
+    return out
+
+
 def poll_loop():
+    if DEMO:
+        while True:
+            with LOCK:
+                STATE.update(generatedAt=int(time.time()), errors=[], sessions=demo_sessions())
+            try:
+                with open(os.path.join(WEBROOT, "data", "sessions.json"), "w") as f:
+                    json.dump(STATE, f)
+            except Exception:
+                pass
+            time.sleep(INTERVAL)
     with open(ENRICH_PY) as f:
         src = f.read()
     while True:
@@ -132,6 +191,8 @@ def attach_command(s):
 
 
 def open_terminal(host, sid):
+    if DEMO:
+        return False, "demo mode — terminal actions are disabled"
     if not SID_RE.match(sid or ""):
         return False, "invalid session id"
     s = find_session(host, sid)
@@ -159,6 +220,8 @@ def open_terminal(host, sid):
 
 
 def get_logs(host, sid):
+    if DEMO:
+        return DEMO_LOG
     if not SID_RE.match(sid or ""):
         return "invalid session id"
     s = find_session(host, sid)
@@ -181,6 +244,8 @@ def get_logs(host, sid):
 
 
 def get_diff(host, sid):
+    if DEMO:
+        return DEMO_DIFF
     s = find_session(host, sid)
     if not s:
         return "unknown session"
@@ -202,6 +267,8 @@ def get_diff(host, sid):
 
 
 def stop_session(host, sid):
+    if DEMO:
+        return False, "demo mode — stop is disabled"
     if not SID_RE.match(sid or ""):
         return False, "invalid session id"
     s = find_session(host, sid)
@@ -225,6 +292,8 @@ def host_target(host):
 
 
 def new_session(host, cwd, prompt):
+    if DEMO:
+        return False, "demo mode — starting sessions is disabled"
     prompt = (prompt or "").strip()
     if len(prompt) < 4:
         return False, "prompt too short"
@@ -290,6 +359,8 @@ def gh_pr(target, cwd, branch):
 
 
 def pr_loop():
+    if DEMO:
+        return
     while True:
         with LOCK:
             sess = list(STATE["sessions"])
@@ -323,9 +394,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             with LOCK:
                 data = dict(STATE)
             sess = [dict(s) for s in data.get("sessions", [])]
-            with PR_LOCK:
-                for s in sess:
-                    s["pr"] = PR_CACHE.get("%s|%s|%s" % (s.get("host"), s.get("cwd"), s.get("gitBranch")))
+            if not DEMO:
+                with PR_LOCK:
+                    for s in sess:
+                        s["pr"] = PR_CACHE.get("%s|%s|%s" % (s.get("host"), s.get("cwd"), s.get("gitBranch")))
             data["sessions"] = sess
             self._json(data)
             return
@@ -385,7 +457,7 @@ class Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
 def main():
     threading.Thread(target=poll_loop, daemon=True).start()
     threading.Thread(target=pr_loop, daemon=True).start()
-    print("cc-cockpit server on http://%s:%d" % (BIND, PORT), flush=True)
+    print("cc-cockpit server on http://%s:%d%s" % (BIND, PORT, "  [DEMO MODE]" if DEMO else ""), flush=True)
     Server((BIND, PORT), Handler).serve_forever()
 
 

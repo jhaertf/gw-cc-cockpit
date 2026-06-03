@@ -53,6 +53,16 @@ This installs an autostarting local service (launchd on macOS, `systemd --user` 
 
 > The local machine's own sessions can only be read by a process running on that machine — that's why the collector runs natively (not in a container).
 
+### Try it without any sessions (demo mode)
+
+Want to see the dashboard populated before wiring up real hosts?
+
+```bash
+CC_DEMO=1 python3 server.py    # then open http://127.0.0.1:8910
+```
+
+Demo mode serves the anonymized sample data shown in the screenshots — no SSH, no hosts required, and write-actions (open terminal / stop / new session) are disabled.
+
 ## Add more hosts
 
 The easiest way — authorizes the dedicated key, verifies Claude Code, and registers the host:
@@ -79,6 +89,7 @@ Environment variables (set in the service unit, or when running `server.py` dire
 | `CC_PORT` | `8910` | HTTP port |
 | `CC_BIND` | `127.0.0.1` | bind address (keep localhost unless you front it with auth) |
 | `CC_INTERVAL` | `8` | poll interval in seconds |
+| `CC_DEMO` | `0` | serve built-in anonymized sample data — no SSH, write-actions disabled |
 
 Files live in `~/.config/cc-cockpit/` (config + key) and `~/.local/share/cc-cockpit/` (code, web UI, logs).
 
