@@ -1,0 +1,13 @@
+[Unit]
+Description=cc-cockpit — Claude Code session dashboard
+After=network.target
+
+[Service]
+ExecStart=__PYTHON__ __SERVER__
+Environment=CC_PORT=__PORT__
+Environment=CC_BIND=127.0.0.1
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=default.target

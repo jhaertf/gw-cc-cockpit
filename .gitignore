@@ -1,0 +1,14 @@
+# Secrets & local runtime — NEVER commit these
+id_cockpit
+id_cockpit.pub
+*.key
+*.pem
+hosts.conf
+known_hosts
+data/
+run/
+*.log
+
+__pycache__/
+*.pyc
+.DS_Store

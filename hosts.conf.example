@@ -1,0 +1,14 @@
+# cc-cockpit hosts — one line per source:
+#
+#   <label>|local|claude agents --json     this machine (reads sessions directly)
+#   <label>|ssh|<user@host>                 remote machine (via the dedicated key)
+#
+# Lines starting with # and blank lines are ignored.
+# Easiest way to add a remote host:  ./scripts/add-host.sh <label> <user@host>
+# After manual edits, reload the service (see README → "Manage").
+
+local|local|claude agents --json
+
+# Examples (replace with your own):
+# build01|ssh|deploy@build01.internal
+# gpu|ssh|ubuntu@10.0.0.5
